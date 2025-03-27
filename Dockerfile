@@ -68,7 +68,9 @@ RUN curl --retry 5 --retry-delay 10 -k -sL https://packagecloud.io/install/repos
 #    git lfs install
 
 # 5. 创建虚拟环境
-RUN python3 -m venv /opt/venv
+RUN python3 -m venv /opt/venv && \
+    chown -R node:node /opt/venv && \
+    chmod -R 755 /opt/venv
 
 # 6. 配置pip
 RUN /opt/venv/bin/pip config set global.index-url https://pypi.org/simple/ && \
@@ -90,7 +92,7 @@ RUN git lfs pull
 RUN sed -i '/pyinstaller==4.8/d' requirements.txt && \
     echo "pyinstaller>=6.0.0" >> requirements.txt
 
-# 9. 安装项目依赖
+# 9. 安装项目依赖（移除 --user 参数）
 RUN /opt/venv/bin/pip install --default-timeout=100 --retries 10 -r requirements.txt
 
 # 修改 yarn 安装步骤，添加镜像源和重试参数
@@ -168,8 +170,17 @@ RUN yarn config set npmRegistryServer https://registry.npmmirror.com \
     && yarn install --immutable
 
 # 2. 复制构建产物
-COPY --from=builder /opt/venv /opt/venv
-COPY --from=builder /app /app
+COPY --from=builder --chown=node:node /opt/venv /opt/venv
+COPY --from=builder --chown=node:node /app /app
+
+# 5. 删除冗余权限设置（移除以下代码）
+# RUN chmod +x /app/b && \
+#    chown -R node:node /app
+
+# 3. 设置环境变量前添加权限修复（移除以下代码）
+# RUN chown -R node:node /opt/venv && \
+#    chmod -R 755 /opt/venv && \
+#    chown -R node:node /opt/venv
 
 # 3. 设置环境变量
 ENV PATH="/opt/venv/bin:$PATH"
@@ -178,19 +189,16 @@ ENV LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
 # 4. 初始化Git LFS
 RUN git lfs install
 
-# 5. 设置权限
-RUN chmod +x /app/b && \
-    chown -R node:node /app
+# 5. 删除冗余权限设置（此处已移除）
 
 # 6. 使用非root用户
 USER node
 WORKDIR /app
-
-
 
 # 7. 暴露端口
 EXPOSE 3000
 
 # 8. 启动命令
 CMD ["./b", "data-snapshot", "run"]
+
 
