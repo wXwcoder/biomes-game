@@ -66,9 +66,10 @@ RUN curl --retry 5 --retry-delay 10 -k -sL https://packagecloud.io/install/repos
 #    apt-get update && \
 #    apt-get install -y git-lfs && \
 #    git lfs install
-
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm config get registry
 # 新增 Bazel 安装步骤
-RUN npm install -g @bazel/bazelisk@latest --registry=https://registry.npmmirror.com
+#RUN npm install -g @bazel/bazelisk@latest --registry=https://registry.npmmirror.com
 
 # 5. 创建虚拟环境
 RUN python3 -m venv /opt/venv && \
@@ -158,11 +159,14 @@ RUN mkdir -p /etc/apt && \
     libpng16-16 \
     libtiff6 \
     libwebp7 \
+    rsync \
     && rm -rf /var/lib/apt/lists/*
 
 ENV npm_config_registry=https://registry.npmmirror.com
 #ENV YARN_REGISTRY=https://registry.npmmirror.com
 
+RUN npm config set registry https://registry.npmmirror.com
+RUN npm config get registry
 # 新增 Bazel 安装步骤
 RUN npm install -g @bazel/bazelisk@latest --registry=https://registry.npmmirror.com
 
