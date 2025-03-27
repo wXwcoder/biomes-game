@@ -47,10 +47,11 @@ RUN apt-get -o Acquire::Retries=5 update && \
 # 3. 设置npm registry（带重试参数）
 # 3. 设置npm registry（带重试参数）
 ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
-ENV YARN_REGISTRY=https://registry.npmmirror.com
+#ENV YARN_REGISTRY=https://registry.npmmirror.com
+# 修改 corepack 配置
 RUN npm install -g corepack@latest --fetch-retries=5 --fetch-retry-mintimeout=20000 \
     && corepack enable \
-    && corepack prepare yarn@stable --activate
+    && corepack prepare yarn@4.1.0 --activate
 
 # 4. 安装Git LFS（使用修正的阿里云镜像）
 # 4. 安装Git LFS（修复镜像路径）
@@ -77,6 +78,12 @@ RUN /opt/venv/bin/pip config set global.index-url https://pypi.org/simple/ && \
 WORKDIR /app
 #RUN git clone https://github.com/ill-inc/biomes-game.git --depth=1 .
 COPY . .
+
+# 新增 yarn 配置步骤（在项目目录上下文）
+#RUN yarn config set npmRegistryServer https://registry.npmmirror.com \
+#    && yarn config set httpRetry 5 \
+#    && yarn config set networkTimeout 600000
+
 RUN git lfs pull
 
 # 8. 修改requirements.txt（移除或更新pyinstaller）
@@ -87,12 +94,13 @@ RUN sed -i '/pyinstaller==4.8/d' requirements.txt && \
 RUN /opt/venv/bin/pip install --default-timeout=100 --retries 10 -r requirements.txt
 
 # 修改 yarn 安装步骤，添加镜像源和重试参数
-RUN yarn config set registry https://registry.npmmirror.com
+#RUN yarn config set registry https://registry.npmmirror.com
 #RUN yarn config set npmRegistryServer https://registry.npmmirror.com \
 #    && yarn config set enableImmutableInstalls false \
 #    && yarn install --immutable --immutable-cache --network-timeout 600000 --retry 5 \
 #    --registry=https://registry.npmmirror.com \
 #    --mirror https://registry.npmmirror.com/react-leaflet-markercluster/-/react-leaflet-markercluster-3.0.0-rc.0.tgz
+
 
 # ===================== 运行阶段 =====================
 FROM node:20.9.0-bookworm-slim
@@ -147,6 +155,18 @@ RUN mkdir -p /etc/apt && \
     libwebp7 \
     && rm -rf /var/lib/apt/lists/*
 
+ENV npm_config_registry=https://registry.npmmirror.com
+#ENV YARN_REGISTRY=https://registry.npmmirror.com
+
+# 修改 yarn 安装步骤，适配 Yarn Berry
+RUN yarn config set npmRegistryServer https://registry.npmmirror.com \
+    && yarn config set httpRetry 5 \
+    && yarn config set networkTimeout 600000 \
+    && yarn config set enableImmutableInstalls false \
+    && echo "nodeLinker: node-modules" > .yarnrc.yml \
+    && echo "packageManager: yarn@4.1.0" >> .yarnrc.yml \
+    && yarn install --immutable
+
 # 2. 复制构建产物
 COPY --from=builder /opt/venv /opt/venv
 COPY --from=builder /app /app
@@ -166,17 +186,11 @@ RUN chmod +x /app/b && \
 USER node
 WORKDIR /app
 
+
+
 # 7. 暴露端口
 EXPOSE 3000
 
 # 8. 启动命令
 CMD ["./b", "data-snapshot", "run"]
-ENV npm_config_registry=https://registry.npmmirror.com
-ENV YARN_REGISTRY=https://registry.npmmirror.com
 
-# 修改 yarn 安装步骤，适配 Yarn Berry
-RUN yarn config set registry https://registry.npmmirror.com \
-    && yarn config set httpRetry 5 \
-    && yarn config set networkTimeout 600000 \
-    && yarn config set enableImmutableInstalls false \
-    && yarn install --immutable
