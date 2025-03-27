@@ -67,6 +67,9 @@ RUN curl --retry 5 --retry-delay 10 -k -sL https://packagecloud.io/install/repos
 #    apt-get install -y git-lfs && \
 #    git lfs install
 
+# 新增 Bazel 安装步骤
+RUN npm install -g @bazel/bazelisk@latest --registry=https://registry.npmmirror.com
+
 # 5. 创建虚拟环境
 RUN python3 -m venv /opt/venv && \
     chown -R node:node /opt/venv && \
@@ -159,6 +162,9 @@ RUN mkdir -p /etc/apt && \
 
 ENV npm_config_registry=https://registry.npmmirror.com
 #ENV YARN_REGISTRY=https://registry.npmmirror.com
+
+# 新增 Bazel 安装步骤
+RUN npm install -g @bazel/bazelisk@latest --registry=https://registry.npmmirror.com
 
 # 修改 yarn 安装步骤，适配 Yarn Berry
 RUN yarn config set npmRegistryServer https://registry.npmmirror.com \
