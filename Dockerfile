@@ -99,14 +99,13 @@ RUN sed -i '/pyinstaller==4.8/d' requirements.txt && \
 # 9. 安装项目依赖（移除 --user 参数）
 RUN /opt/venv/bin/pip install --default-timeout=100 --retries 10 -r requirements.txt
 
-# 修改 yarn 安装步骤，添加镜像源和重试参数
-#RUN yarn config set registry https://registry.npmmirror.com
-#RUN yarn config set npmRegistryServer https://registry.npmmirror.com \
-#    && yarn config set enableImmutableInstalls false \
-#    && yarn install --immutable --immutable-cache --network-timeout 600000 --retry 5 \
-#    --registry=https://registry.npmmirror.com \
-#    --mirror https://registry.npmmirror.com/react-leaflet-markercluster/-/react-leaflet-markercluster-3.0.0-rc.0.tgz
-
+# 新增：安装运行时需要的Python依赖
+RUN /opt/venv/bin/pip install \
+    click_default_group==1.2.4 \
+    psutil==7.0.0 \
+    python-dotenv==1.1.0 \
+    requests==2.32.3 \
+    watchfiles==1.0.4
 
 # ===================== 运行阶段 =====================
 FROM node:20.9.0-bookworm-slim
