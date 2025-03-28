@@ -69,6 +69,7 @@ def run_yarn_install(hide_output_for_seconds=0):
             # Ensure devDependencies are also installed, regardless of what
             # NODE_ENV is set to.
             "--production=false",
+            "--registry=https://registry.npmmirror.com",
         ],
         output_header=f"Running `yarn install`...",
         close_fds=True,

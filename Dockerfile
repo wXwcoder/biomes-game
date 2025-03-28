@@ -29,7 +29,25 @@ RUN mkdir -p /etc/apt && \
     curl \
     gnupg2 \
     libnss3 \
+    build-essential \
+    gcc \
+    g++ \
+    make \
+    python3-full \
+    python3-dev \
+    zlib1g-dev \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libwebp-dev \
+    clang \
     && rm -rf /var/lib/apt/lists/*
+
+# 设置编译器环境变量
+ENV CC=/usr/bin/gcc \
+    CXX=/usr/bin/g++ \
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    BAZEL_CXXOPTS="-std=c++17"
 
 # 2. 安装系统依赖
 RUN apt-get -o Acquire::Retries=5 update && \
@@ -149,17 +167,36 @@ RUN mkdir -p /etc/apt && \
     echo "deb [trusted=yes] https://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
     echo "deb [trusted=yes] https://mirrors.aliyun.com/debian/ bookworm-backports main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
     echo "deb [trusted=yes] https://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
-    apt-get -o Acquire::Retries=5 -o Acquire::http::Dl-Limit=100 update && \
-    apt-get -o Acquire::Retries=5 -o Acquire::http::Dl-Limit=100 install -y --no-install-recommends \
-    python3 \
-    git-lfs \
-    zlib1g \
-    libjpeg62-turbo \
-    libpng16-16 \
-    libtiff6 \
-    libwebp7 \
-    rsync \
+    apt-get -o Acquire::Retries=10 -o Acquire::http::Dl-Limit=100 -o Acquire::https::Timeout=120 -o APT::Get::Fix-Missing=true update && \
+    for i in {1..3}; do \
+        apt-get -o Acquire::Retries=10 -o Acquire::http::Dl-Limit=100 -o Acquire::https::Timeout=120 install -y --fix-missing --no-install-recommends \
+            python3 \
+            git-lfs \
+            zlib1g \
+            libjpeg62-turbo \
+            libpng16-16 \
+            libtiff6 \
+            libwebp7 \
+            rsync \
+            build-essential \
+            gcc \
+            g++ \
+            make \
+            clang \
+        && break \
+        || { echo "Retry $i..."; sleep 10; }; \
+    done \
     && rm -rf /var/lib/apt/lists/*
+
+# 设置编译器环境变量和优化参数
+ENV CC=/usr/bin/gcc \
+    CXX=/usr/bin/g++ \
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" \
+    BAZEL_CXXOPTS="-std=c++17 -O2" \
+    BAZEL_COMPILATION_MODE=opt \
+    BAZEL_JAVAC_OPTS="-J-Xmx2g" \
+    BAZEL_BUILD_OPTS="--local_cpu_resources=HOST_CPUS*.75 --local_ram_resources=HOST_RAM*.75" \
+    BAZEL_STARTUP_OPTS="--host_jvm_args=-Xmx2g"
 
 ENV npm_config_registry=https://registry.npmmirror.com
 #ENV YARN_REGISTRY=https://registry.npmmirror.com
@@ -176,7 +213,18 @@ RUN yarn config set npmRegistryServer https://registry.npmmirror.com \
     && yarn config set enableImmutableInstalls false \
     && echo "nodeLinker: node-modules" > .yarnrc.yml \
     && echo "packageManager: yarn@4.1.0" >> .yarnrc.yml \
-    && yarn install --immutable
+    # 预先安装 node-gyp
+    && npm install -g node-gyp \
+    # 安装 sharp 依赖
+    && apt-get update && apt-get install -y --no-install-recommends \
+       libvips-dev \
+    # 添加 ccache
+       ccache \
+    && rm -rf /var/lib/apt/lists/* \
+    # 配置 ccache
+    && ccache --max-size=10G \
+    # 使用 --network-timeout 参数
+    && yarn install --immutable --network-timeout 600000
 
 # 2. 复制构建产物
 COPY --from=builder --chown=node:node /opt/venv /opt/venv

@@ -34,8 +34,6 @@ def compress_gltf(gltf: pygltflib.GLTF2) -> bytes:
         with open(GLTF_FILE_NAME, "w") as gltf_file:
             gltf_file.write(gltf_bytes)
 
-        # If we're on Windows, run this through a shell or else it can't
-        # find yarn.
         useShell = os.name == "nt"
 
         cmd = [
@@ -45,9 +43,29 @@ def compress_gltf(gltf: pygltflib.GLTF2) -> bytes:
             str(GLTF_FILE_NAME),
             "-o",
             str(GLB_FILE_NAME),
-            "-kn",  # Don't prune empty nodes, used as attachment points.
+            "-kn",
+            "--registry=https://registry.npmmirror.com",
+            "--network-timeout", "600000",
+            "--network-concurrency", "1"
         ]
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, shell=useShell)
+        
+        # 添加重试逻辑
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                result = subprocess.run(
+                    cmd, 
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    shell=useShell,
+                    timeout=300
+                )
+                if result.returncode == 0:
+                    break
+            except subprocess.TimeoutExpired:
+                if attempt == max_retries - 1:
+                    raise
+                continue
 
         with open(GLB_FILE_NAME, "rb") as glb_file:
             out_bytes = glb_file.read()
